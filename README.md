@@ -3,5 +3,4 @@
 GitHub Pages로 공개하는 게임 파일만 모아 둔 저장소입니다. 원본과 작업 내용은 비공개 저장소(`dush-game`)에 있고, 거기서 고친 뒤 이곳에 복사해 올립니다.
 
 - 게임: `index.html`
-- 실시간 랭킹 전광판: `board.html`
 - 선생님용 랭킹 관리: `admin.html`
