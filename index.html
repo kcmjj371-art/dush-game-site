@@ -211,7 +211,9 @@ body:not(.moving) .petals { display: none; }
 .title .btn-row { margin-top: 8px; }
 .title .btn.ghost { background: rgba(20, 13, 34, .55); border-color: rgba(255, 255, 255, .45); }  /* 밝은 학교 그림 위에서도 보이게 */
 .tbtn.exit { border-color: rgba(255, 143, 184, .55); }
+.tbtn.games { border-color: rgba(255, 210, 61, .6); color: #ffe48a; font-weight: 700; }
 .tbtn[hidden] { display: none; }
+.tbtn.motion .ic { display: none; }
 .exit-panel { max-width: 420px; text-align: center; } .exit-panel .btn-row { margin: 16px auto 0; }
 /* 만든 사람: 첫 화면 왼쪽 아래에 작고 은은하게 */
 .title .credit { position: absolute; left: 18px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); font: italic 500 11.5px var(--serif); letter-spacing: .16em; color: rgba(255, 255, 255, .5); text-shadow: 0 1px 4px rgba(0, 0, 0, .55); pointer-events: none; }
@@ -503,7 +505,9 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 480px) {
   .brand { display: none; }
   .topbar, .tbar { gap: 6px; }
-  .tbtn { padding: 7px 10px; font-size: 16px; }
+  .topbar { justify-content: flex-end; }  /* 학교 영문 이름이 숨겨지므로 버튼을 오른쪽 위에 붙임 */
+  .tbtn { padding: 7px 8px; font-size: 15px; }
+  .tbtn.motion .ic { display: inline; } .tbtn.motion .lbl { display: none; }  /* 버튼이 5개라 휴대폰에서는 아이콘만 */
   .banner small { font-size: 16px; } .banner b { font-size: 38px; }
   .dialog { min-height: 170px; padding: 30px 18px 18px; }
   .nameplate b { font-size: 21px; } .nameplate small { font-size: 15px; }
@@ -561,9 +565,10 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="brand" id="brand">DAEJEON URBAN SCIENCE HIGH SCHOOL</div>
     <div class="tools">
       <button class="tbtn exit" type="button" id="exitBtn" hidden>나가기</button>
-      <button class="tbtn" type="button" id="motionBtn" aria-pressed="false">움직임 멈추기</button>
+      <button class="tbtn motion" type="button" id="motionBtn" aria-pressed="false" aria-label="움직임 멈추기"><span class="ic" aria-hidden="true">⏸</span><span class="lbl">움직임 멈추기</span></button>
+      <button class="tbtn games" type="button" id="gamesBtn">미니게임</button>
       <button class="tbtn" type="button" id="infoBtn">입학<span class="long"> 안내</span></button>
-      <button class="tbtn apply" type="button" id="applyBtn">신청서 작성</button>
+      <button class="tbtn apply" type="button" id="applyBtn">신청서<span class="long"> 작성</span></button>
     </div>
   </header>
 

@@ -164,10 +164,12 @@ function setMotion(on) {
   prog.motion = on; saveProg();
   if (vid) titleVideo(videoWanted);
   document.body.classList.toggle("moving", on);
-  $("#motionBtn").textContent = on ? "움직임 멈추기" : "움직임 켜기";
+  const label = on ? "움직임 멈추기" : "움직임 켜기";
+  $("#motionBtn .lbl").textContent = label; $("#motionBtn .ic").textContent = on ? "⏸" : "▶"; $("#motionBtn").setAttribute("aria-label", label);
   $("#motionBtn").setAttribute("aria-pressed", String(!on));
 }
 const schoolImg = () => G.images.bloom;
+let where = "";  // 지금 화면: title·hub·games(게임 고르기)·playing 등 — 오른쪽 위 미니게임 버튼이 씀
 async function fade(fn) {
   const f = $("#fade"); f.classList.add("on"); await wait(360);
   await fn(); f.classList.remove("on"); await wait(200);
@@ -373,6 +375,7 @@ $("#applyBtn").addEventListener("click", () => openForm());
 
 /* ---------- 화면 ---------- */
 async function titleScreen() {
+  where = "title";
   $("#exitBtn").hidden = true;
   hide(); dialog.hidden = true; curCourse = null;
   await setScene(schoolImg(), { x: .5, y: .45 });
@@ -386,16 +389,15 @@ async function titleScreen() {
     <div class="btn-row">
       <button class="btn primary" type="button" id="enterBtn">입장하기</button>
       ${anyDone ? `<button class="btn" type="button" id="contBtn">이어서 둘러보기 (${prog.done.length}/${G.courses.length})</button>` : ""}
-      <button class="btn ghost" type="button" id="gamesBtn">🎮 미니게임 바로가기</button>
     </div>
     <div class="credit"><span aria-hidden="true">✿</span> made by 강철민</div>`, "title");
   $("#enterBtn", o).addEventListener("click", () => { prog.done = []; prog.guide = null; saveProg(); intro(); });
   if (anyDone) $("#contBtn", o).addEventListener("click", () => fade(hub));
-  $("#gamesBtn", o).addEventListener("click", () => fade(() => gameList("title")));
 }
 
 // 미니게임 바로가기: 학과 탐방 없이 6개 게임 중 하나를 골라 바로 하기 (랭킹도 똑같이 등록됨)
 async function gameList(back) {
+  where = "games";
   $("#exitBtn").hidden = false;
   titleVideo(false);
   hide(); dialog.hidden = true; curCourse = null;
@@ -410,6 +412,7 @@ async function gameList(back) {
         <span class="body"><b>${esc(c.game.title)}</b><small>${esc(c.name)}</small><span class="go">게임 시작 ›</span></span></button>`).join("")}</div>
     <div class="hub-foot"><button class="btn" type="button" id="glBack" style="max-width:420px">${back === "hub" ? "↩ 학과 목록으로 돌아가기" : "↩ 처음 화면으로 돌아가기"}</button></div>`, "hub dim games");
   o.querySelectorAll(".course").forEach(b => b.addEventListener("click", async () => {
+    where = "playing";
     await miniGame(list.find(c => c.id === b.dataset.id));
     gameList(back);
   }));
@@ -430,6 +433,7 @@ function pickGuide() {
 }
 
 async function intro() {
+  where = "tour";
   $("#exitBtn").hidden = false;
   titleVideo(false);
   await fade(async () => { hide(); petals(true); ambient(null); await setScene(schoolImg(), { x: .5, y: .45 }); sceneEl.classList.add("soft"); showSprite("pair"); });
@@ -447,6 +451,7 @@ async function intro() {
 }
 
 async function hub(justDone) {
+  where = "hub";
   $("#exitBtn").hidden = false;
   titleVideo(false);
   hide(); dialog.hidden = true; curCourse = null;
@@ -470,11 +475,9 @@ async function hub(justDone) {
       <div class="bubble"><b>${esc(G.guides[prog.guide || "hr"].name)}</b>${esc(line)}</div>
       ${n === total ? `<button class="btn primary" type="button" id="finaleBtn" style="max-width:420px">서준·하린 선배에게 돌아가기</button>`
         : `<button class="linkish" type="button" id="finaleBtn">탐방 마무리하고 선배들에게 돌아가기</button>`}
-      <button class="linkish" type="button" id="hubGames">🎮 미니게임만 바로 하기</button>
     </div>`, "hub dim");
   o.querySelectorAll(".course").forEach(b => b.addEventListener("click", () => runCourse(G.courses.find(c => c.id === b.dataset.id))));
   $("#finaleBtn", o).addEventListener("click", finale);
-  $("#hubGames", o).addEventListener("click", () => fade(() => gameList("hub")));
   if (justDone) o.querySelector(`[data-id="${justDone}"]`)?.scrollIntoView({ block: "nearest" });
 }
 
@@ -680,6 +683,7 @@ function explorePanels(c) {
 }
 
 async function runCourse(c) {
+  where = "tour";
   curCourse = c;
   // 말하는 사람에 맞춰 그림을 바꿈: 선배 대사 → 그 선배 한 명, 내레이션 → 배경
   const solo = (who, t) => { showSprite(who === "m" || who === "f" ? who : "bg"); return say(who, t); };
@@ -731,6 +735,7 @@ async function runCourse(c) {
 }
 
 async function finale() {
+  where = "tour";
   const F = G.finale;
   // 고른 안내 선배가 먼저 말하도록 서준·하린 순서를 바꿈
   const sw = l => prog.guide === "hr" ? [l[0] === "sj" ? "hr" : l[0] === "hr" ? "sj" : l[0], ...l.slice(1)] : l;
@@ -753,6 +758,7 @@ async function finale() {
 
 let groupPan = null;
 async function groupScreen() {
+  where = "tour";
   hide(); dialog.hidden = true; curCourse = null;
   await setScene(G.images.finale, { x: .5, y: .4 });
   petals(true); ambient("sparkle");
@@ -774,6 +780,12 @@ async function groupScreen() {
 }
 
 $("#motionBtn").addEventListener("click", () => setMotion(!prog.motion));
+// 오른쪽 위 '미니게임': 처음 화면·학과 목록에서는 바로 게임 고르기로, 탐방·게임 중이면 멈추고 새로 열어서 게임 고르기로 (다 본 학과는 그대로 저장됨)
+$("#gamesBtn").addEventListener("click", () => {
+  if (where === "games") return;
+  if (where === "title" || where === "hub") { const back = where; fade(() => gameList(back)); return; }
+  location.hash = "games"; location.reload();
+});
 // 나가기: 진행 중인 장면·게임을 멈추고 학과 목록이나 처음 화면으로 (다 본 학과는 그대로 저장됨)
 $("#exitBtn").addEventListener("click", () => {
   const m = openModal(`<div class="panel exit-panel">
@@ -791,6 +803,7 @@ $("#exitBtn").addEventListener("click", () => {
 });
 setMotion(prog.motion);
 // 나가기로 '학과 목록으로'를 고른 경우: 바로 학과 목록부터
-if (location.hash === "#hub" && prog.guide) { history.replaceState(null, "", location.pathname); hub(); }
+if (location.hash === "#games") { history.replaceState(null, "", location.pathname); gameList(prog.guide ? "hub" : "title"); }
+else if (location.hash === "#hub" && prog.guide) { history.replaceState(null, "", location.pathname); hub(); }
 else { if (location.hash) history.replaceState(null, "", location.pathname); titleScreen(); }
 })();
