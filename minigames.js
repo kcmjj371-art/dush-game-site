@@ -232,10 +232,6 @@
   function drone(area, api) {
     const ac = new AbortController(), W = area.clientWidth, H = area.clientHeight, S = H / 380, FLY = 30;
     const GROUND = H * .9, DX = W * .26, DW = 64, DH = DW * 200 / 427;  // 땅 높이, 드론 x 위치와 크기
-    const PYLON = `<svg viewBox="0 0 60 200" preserveAspectRatio="none" aria-hidden="true"><g stroke="#4b5563" stroke-width="3" fill="none" stroke-linejoin="round">
-      <path d="M8 200 L26 12 L34 12 L52 200"/><path d="M12 160 H48 M15 120 H45 M19 80 H41 M22 45 H38"/>
-      <path d="M8 200 L45 120 M52 200 L15 120 M12 160 L41 80 M48 160 L19 80 M15 120 L38 45 M45 120 L22 45"/>
-      <path d="M2 40 H58 M8 70 H52" stroke-width="4"/></g><circle class="lamp" cx="30" cy="8" r="5" fill="#ff3b4f"/></svg>`;
     area.innerHTML = `<div class="mg-fly"></div><div class="mg-pad" hidden><b>H</b></div>
       <div class="mg-drone fly"><img src="${MG}drone_drone.webp" alt="" draggable="false"></div><div class="mg-vs" hidden></div>`;
     const bg = area.querySelector(".mg-fly"), dr = area.querySelector(".mg-drone"), pad = area.querySelector(".mg-pad"), vs = area.querySelector(".mg-vs");
@@ -247,8 +243,8 @@
     const add = kind => {
       const d = document.createElement("div"), o = { d, kind, x: W + 40 };
       if (kind === "pylon") {
-        o.w = 46; o.h = rand(.32, .56) * H; o.top = GROUND - o.h;
-        d.className = "mg-pylon"; d.innerHTML = PYLON; Object.assign(d.style, { width: o.w + "px", height: o.h + "px", top: o.top + "px" });
+        o.h = rand(.32, .56) * H; o.w = o.h * 217 / 600; o.top = GROUND - o.h;  // 송전탑 그림(선생님 제공) 비율대로
+        d.className = "mg-pylon"; d.innerHTML = `<img src="${MG}drone_pylon.webp" alt="" draggable="false">`; Object.assign(d.style, { width: o.w + "px", height: o.h + "px", top: o.top + "px" });
       } else {
         o.w = kind === "bird" ? 44 : 30; o.h = kind === "bird" ? 24 : 35; o.base = rand(H * .12, GROUND - H * .35); o.ph = rand(0, 6);
         d.className = kind === "bird" ? "mg-bird" : "mg-mark"; Object.assign(d.style, { width: o.w + "px", height: o.h + "px" });

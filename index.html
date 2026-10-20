@@ -411,9 +411,8 @@ table.quota thead th:first-child { text-align: left; }
 .mg-drone.thrust img { filter: drop-shadow(0 6px 4px rgba(0,0,0,.3)) drop-shadow(0 4px 8px rgba(120, 230, 255, .8)); }
 .mg-drone.hit img { animation: shake .3s; } .mg-drone.blink { opacity: .35; }
 .mg-pylon { position: absolute; left: 0; filter: drop-shadow(0 2px 2px rgba(0,0,0,.25)); }
-.mg-pylon svg { width: 100%; height: 100%; display: block; } .mg-pylon .lamp { animation: lamp 1s steps(1) infinite; }
-@keyframes lamp { 50% { opacity: .25; } }
-.mg-pylon.bump { filter: drop-shadow(0 0 6px #ff3b4f); }
+.mg-pylon img { width: 100%; height: 100%; display: block; }
+.mg-pylon.bump { filter: drop-shadow(0 0 6px #ff3b4f) drop-shadow(0 0 3px #ff3b4f); }
 .mg-mark, .mg-bird { position: absolute; left: 0; top: 0; background: center / contain no-repeat; }
 .mg-mark { background-image: url("img/mg/drone_target.webp"); filter: drop-shadow(0 0 6px rgba(47,191,90,.8)); transition: transform .25s, opacity .25s; }
 .mg-mark.got { transform: scale(1.6); opacity: 0; } .mg-bird.bump { opacity: .3; }
