@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>랭킹 관리</title>
+<style>
+  /* 선생님용 랭킹 관리 페이지: 비밀번호(apps-script/Code.gs 의 ADMIN_KEY)를 넣어야 기록이 보이고 지울 수 있음. 기록은 구글 시트 "랭킹" 탭 */
+  :root { --bg: #140c22; --card: #22163a; --edge: rgba(200, 170, 255, .25); --fg: #f4eefc; --muted: #b9add0; --accent: #a77bff; --bad: #ff6b81; --gold: #ffd23d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 "Pretendard", system-ui, -apple-system, "Malgun Gothic", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+  .card { background: var(--card); border: 1px solid var(--edge); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+  .row { display: flex; gap: 8px; }
+  input, select { flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--edge); background: #0f0919; color: var(--fg); font: inherit; }
+  button { cursor: pointer; padding: 11px 16px; border-radius: 10px; border: 1px solid var(--edge); background: #2f2050; color: var(--fg); font: inherit; white-space: nowrap; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #140c22; font-weight: 700; }
+  button.danger { border-color: rgba(255, 107, 129, .6); color: var(--bad); background: transparent; }
+  button:disabled { opacity: .5; cursor: default; }
+  .msg { font-size: 14px; margin-top: 10px; min-height: 1.5em; }
+  .msg.err { color: var(--bad); } .msg.ok { color: #6fe0a5; }
+  ol { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid rgba(200, 170, 255, .12); }
+  li .no { width: 30px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  li:nth-child(-n+3) .no { color: var(--gold); font-weight: 700; }
+  li .nm { flex: 1; overflow-wrap: anywhere; }
+  li .sc { font-variant-numeric: tabular-nums; color: var(--muted); }
+  li .dt { display: block; font-size: 12px; color: var(--muted); }
+  li button { padding: 6px 10px; font-size: 14px; }
+  .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+  .head b { font-size: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>미니게임 랭킹 관리</h1>
+  <p class="sub">대전도시과학고 학과 탐방 게임 · 선생님용 페이지 (학생들에게는 알려 주지 마세요)</p>
+
+  <div class="card">
+    <label for="key">관리 비밀번호</label>
+    <div class="row">
+      <input id="key" type="password" autocomplete="current-password" placeholder="관리 비밀번호">
+      <button class="primary" id="load" type="button">불러오기</button>
+    </div>
+    <label for="game" style="margin-top:12px">게임</label>
+    <select id="game"></select>
+    <div class="msg" id="msg" role="status"></div>
+  </div>
+
+  <div class="card" id="board" hidden>
+    <div class="head"><b id="title"></b><button class="danger" id="clear" type="button">이 게임 기록 전부 지우기</button></div>
+    <div id="list"></div>
+  </div>
+</main>
+<script src="data.js"></script>
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const courses = (window.GAME && window.GAME.courses) || [];
+  $("#game").innerHTML = courses.map(c => `<option value="${esc(c.id)}">${esc(c.name)} — ${esc(c.game ? c.game.title : "")}</option>`).join("");
+  try { $("#key").value = sessionStorage.getItem("dush-admin") || ""; } catch (e) {}
+  const say = (t, cls = "") => { $("#msg").textContent = t; $("#msg").className = "msg " + cls; };
+  const fmt = (kind, v) => { const c = courses.find(x => x.id === $("#game").value); return kind === "points" ? `${Number(v).toLocaleString()}${(c && c.game && c.game.unit) || "점"}` : `${(v / 1000).toFixed(1)}초`; };
+  const when = at => new Date(at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const ERR = { key: "비밀번호가 맞지 않아요.", busy: "지금 등록이 몰려 있어요. 잠시 뒤 다시 해 주세요.", notfound: "이미 지워진 기록이에요. 목록을 새로 불러왔어요." };
+  const EP = (window.GAME && (window.GAME.rankEndpoint || window.GAME.formEndpoint)) || "";
+
+  async function call(body) {
+    const key = $("#key").value.trim();
+    if (!key) { say("비밀번호를 적어 주세요.", "err"); throw new Error("nokey"); }
+    try { sessionStorage.setItem("dush-admin", key); } catch (e) {}
+    let r;
+    try { r = await fetch(EP, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ ...body, key }) }); }
+    catch (e) { say("랭킹 서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 해 주세요.", "err"); throw e; }
+    const d = await r.json().catch(() => ({ error: "server" }));
+    if (d.error) { say(ERR[d.error] || "처리하지 못했어요. 잠시 뒤 다시 해 주세요.", "err"); if (d.error === "notfound") load(true); throw new Error(d.error); }
+    return d;
+  }
+  function draw(d) {
+    const c = courses.find(x => x.id === $("#game").value);
+    $("#board").hidden = false;
+    $("#title").textContent = `${c ? c.name : ""} · 기록 ${d.all.length}개`;
+    $("#clear").disabled = !d.all.length;
+    $("#list").innerHTML = d.all.length ? `<ol>${d.all.map((e, i) => `<li><span class="no">${i + 1}</span><span class="nm">${esc(e.name)}<span class="dt">${when(e.at)}</span></span><span class="sc">${fmt(d.kind, e.score)}</span><button class="danger" type="button" data-i="${i}">지우기</button></li>`).join("")}</ol>` : `<div class="empty">기록이 없어요.</div>`;
+    $("#list").querySelectorAll("button[data-i]").forEach(b => b.addEventListener("click", async () => {
+      const e = d.all[+b.dataset.i];
+      if (!confirm(`「${e.name}」 (${fmt(d.kind, e.score)}) 기록을 지울까요?`)) return;
+      b.disabled = true;
+      try { draw(await call({ rank: "delete", game: $("#game").value, id: e.id })); say(`「${e.name}」 기록을 지웠어요.`, "ok"); } catch (err) { b.disabled = false; }
+    }));
+  }
+  async function load(quiet) {
+    try { const d = await call({ rank: "list", game: $("#game").value }); draw(d); if (!quiet) say("불러왔어요.", "ok"); } catch (e) {}
+  }
+  $("#load").addEventListener("click", () => load());
+  $("#key").addEventListener("keydown", e => { if (e.key === "Enter") load(); });
+  $("#game").addEventListener("change", () => { if ($("#key").value.trim()) load(); });
+  $("#clear").addEventListener("click", async () => {
+    const c = courses.find(x => x.id === $("#game").value);
+    if (!confirm(`${c ? c.name : ""} 게임의 기록을 전부 지울까요? 되돌릴 수 없어요.`)) return;
+    try { draw(await call({ rank: "clear", game: $("#game").value })); say("전부 지웠어요.", "ok"); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>

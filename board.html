@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>실시간 랭킹</title>
+<style>
+  /* 행사장 TV·노트북에 띄워 두는 미니게임 실시간 랭킹 전광판 (10초마다 새로고침, 새 기록은 반짝임) */
+  :root { --bg: #120a20; --card: #1f1436; --edge: rgba(200, 170, 255, .22); --fg: #f6f0ff; --muted: #b9add0; --gold: #ffd23d; --silver: #d9e2f0; --bronze: #f0a36a; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: radial-gradient(ellipse at 50% -10%, #3a1f66, var(--bg) 60%); color: var(--fg); font: 16px/1.4 "Pretendard", system-ui, -apple-system, "Malgun Gothic", sans-serif; }
+  main { min-height: 100%; display: flex; flex-direction: column; padding: clamp(14px, 2.4vw, 32px); gap: clamp(12px, 1.6vw, 22px); }
+  header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .eyebrow { letter-spacing: .3em; font-size: clamp(11px, 1vw, 14px); color: #c9a8ff; }
+  h1 { margin: 2px 0 0; font-size: clamp(26px, 3.4vw, 48px); }
+  .live { color: var(--muted); font-size: clamp(13px, 1.1vw, 16px); display: flex; align-items: center; gap: 8px; }
+  .live i { width: 10px; height: 10px; border-radius: 50%; background: #5fe08f; box-shadow: 0 0 8px #5fe08f; animation: pulse 1.6s infinite; }
+  .live.off i { background: #ff6b81; box-shadow: 0 0 8px #ff6b81; animation: none; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .grid { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(10px, 1.4vw, 20px); }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--edge); border-top: 4px solid var(--accent); border-radius: 16px; padding: clamp(12px, 1.3vw, 20px); display: flex; flex-direction: column; min-width: 0; }
+  .card h2 { margin: 0; font-size: clamp(18px, 1.8vw, 28px); }
+  .card small { color: var(--muted); font-size: clamp(12px, 1vw, 15px); }
+  ol { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  li { display: flex; align-items: center; gap: 10px; padding: clamp(5px, .6vw, 9px) 8px; border-radius: 10px; font-size: clamp(15px, 1.4vw, 22px); }
+  li .no { width: 1.6em; text-align: center; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+  li:nth-child(1) .no { color: var(--gold); } li:nth-child(2) .no { color: var(--silver); } li:nth-child(3) .no { color: var(--bronze); }
+  li:nth-child(1) { background: rgba(255, 210, 61, .1); }
+  li .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  li .sc { font-variant-numeric: tabular-nums; font-weight: 700; }
+  li.new { animation: flash 1.2s ease-out 3; }
+  @keyframes flash { 0% { background: rgba(255, 210, 61, .65); } 100% { background: transparent; } }
+  .empty { color: var(--muted); margin-top: 14px; font-size: clamp(14px, 1.2vw, 18px); }
+  footer { color: var(--muted); font-size: clamp(12px, 1vw, 14px); text-align: right; }
+  @media (prefers-reduced-motion: reduce) { li.new, .live i { animation: none; } li.new { background: rgba(255, 210, 61, .3); } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div><div class="eyebrow">MINI GAME RANKING</div><h1>미니게임 실시간 랭킹</h1></div>
+    <div class="live" id="live" role="status"><i aria-hidden="true"></i><span id="liveText">불러오는 중…</span></div>
+  </header>
+  <div class="grid" id="grid"></div>
+  <footer>대전도시과학고 학과 탐방 · 10초마다 자동으로 바뀌어요</footer>
+</main>
+<script src="data.js"></script>
+<script>
+(() => {
+  const G = window.GAME || {}, EP = G.rankEndpoint || G.formEndpoint, SHOW = 7, EVERY = 10000;
+  const courses = (G.courses || []).filter(c => c.game);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (kind, v, unit) => kind === "points" ? `${Number(v).toLocaleString()}${unit || "점"}` : `${(v / 1000).toFixed(1)}초`;
+  const grid = document.getElementById("grid"), live = document.getElementById("live"), liveText = document.getElementById("liveText");
+  let seen = null;  // 직전에 보였던 기록들 (새로 들어온 기록만 반짝이게)
+  function draw(games) {
+    const now = new Set();
+    grid.innerHTML = courses.map(c => {
+      const g = games[c.id] || { kind: "points", top: [] };
+      const rows = g.top.slice(0, SHOW).map((e, i) => {
+        const k = `${c.id}|${e.name}|${e.score}`; now.add(k);
+        return `<li class="${seen && !seen.has(k) ? "new" : ""}"><span class="no">${i + 1}</span><span class="nm">${esc(e.name)}</span><span class="sc">${fmt(g.kind, e.score, c.game.unit)}</span></li>`;
+      }).join("");
+      return `<section class="card" style="--accent:${c.color}"><h2>${esc(c.game.title)}</h2><small>${esc(c.name)} · ${g.kind === "points" ? "점수 높은 순" : "빨리 끝낸 순"}</small>
+        ${rows ? `<ol>${rows}</ol>` : `<div class="empty">아직 기록이 없어요. 첫 번째 주인공이 되어 봐!</div>`}</section>`;
+    }).join("");
+    seen = now;
+  }
+  async function tick() {
+    try {
+      const r = await fetch(`${EP}?board=1&t=${Date.now()}`);
+      const d = await r.json();
+      if (!d.games) throw new Error("bad");
+      draw(d.games);
+      live.className = "live"; liveText.textContent = `${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })} 업데이트`;
+    } catch (e) {
+      live.className = "live off"; liveText.textContent = "연결이 잠시 끊겼어요 · 다시 시도 중";
+      if (seen === null) draw({});
+    }
+    setTimeout(tick, EVERY);
+  }
+  tick();
+})();
+</script>
+</body>
+</html>
