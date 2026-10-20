@@ -552,7 +552,7 @@ function miniGame(c) {
 
 // ---------- 미니게임 랭킹 (신청서와 같은 구글 Apps Script → 구글 시트 "랭킹" 탭, apps-script/Code.gs) ----------
 const fmtScore = (kind, v, unit = "점") => kind === "points" ? `${Number(v).toLocaleString()}${unit}` : `${(v / 1000).toFixed(1)}초`;
-// 사람이 몰려서 잠깐 실패하면(연결 오류·busy) 1초, 2.5초 뒤 두 번 더 보내 봄
+// 사람이 몰려서 잠깐 실패하면(연결 오류·busy) 조금씩 간격을 늘려 최대 5번 더 보내 봄 (모두 합쳐 30초쯤)
 async function rankCall(opt, game) {
   const ep = G.rankEndpoint || G.formEndpoint;
   if (!ep) throw new Error("no-endpoint");
@@ -564,8 +564,8 @@ async function rankCall(opt, game) {
       if (d.error) { const x = new Error(d.error); x.final = true; throw x; }
       return d;
     } catch (err) {
-      if (err.final || i >= 2) throw err;
-      await new Promise(res => setTimeout(res, i ? 2500 : 1000));
+      if (err.final || i >= 5) throw err;
+      await new Promise(res => setTimeout(res, [1000, 2000, 3500, 5000, 7000][i] + Math.random() * 1500));  // 동시에 다시 몰리지 않게 조금씩 다르게
       // 등록은 됐는데 응답만 깨졌을 수 있으니, 다시 보내기 전에 이미 올라가 있는지 확인 (같은 기록이 두 번 올라가지 않게)
       if (opt && err.message !== "busy") {
         try {
