@@ -11,6 +11,43 @@ try { Object.assign(prog, JSON.parse(localStorage.getItem(KEY)) || {}); } catch 
 if (matchMedia("(prefers-reduced-motion: reduce)").matches) prog.motion = false;
 const saveProg = () => { try { localStorage.setItem(KEY, JSON.stringify(prog)); } catch (e) {} };
 
+// ---------- 방문 기록 (구글 시트 "방문" 탭, apps-script/Code.gs) ----------
+// 방문(하루 한 번)·탐방 완료(학과마다 한 번)·게임 시작(할 때마다)을 휴대폰에 모아 두었다가 1분쯤마다 묶어서 보냄
+// → Apps Script 로 가는 요청이 적어 랭킹 등록을 방해하지 않음. 개인정보 없이 무작위 방문자 번호와 기기 종류만 보냄
+const track = (() => {
+  const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+  let uid = ls.get("dush-uid");
+  if (!/^v[0-9a-z]{6,16}$/.test(uid || "")) { uid = "v" + Math.random().toString(36).slice(2, 12).padEnd(8, "0"); ls.set("dush-uid", uid); }
+  const dev = matchMedia("(pointer: coarse)").matches ? "휴대폰" : "컴퓨터";
+  let q = []; try { q = JSON.parse(ls.get("dush-q")) || []; } catch (e) {}
+  const save = () => ls.set("dush-q", JSON.stringify(q.slice(-50)));
+  let busy = false;
+  async function flush() {
+    const ep = G.rankEndpoint || G.formEndpoint;
+    if (busy || !q.length || !ep) return;
+    busy = true; const batch = q.slice(0, 50);
+    try {
+      const r = await fetch(ep, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ track: batch, uid, dev }) });
+      const d = await r.json();
+      if (d.ok) { q = q.slice(batch.length); save(); }
+    } catch (e) { /* 다음에 다시 보냄 */ }
+    busy = false;
+  }
+  // 화면을 닫거나 다른 앱으로 갈 때는 남은 기록을 바로 보냄 (응답은 못 받음)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "hidden" || !q.length) return;
+    const ep = G.rankEndpoint || G.formEndpoint;
+    if (ep && navigator.sendBeacon && navigator.sendBeacon(ep, new Blob([JSON.stringify({ track: q.slice(0, 50), uid, dev })], { type: "text/plain;charset=utf-8" }))) { q = []; save(); }
+  });
+  setTimeout(function tick() { flush(); setTimeout(tick, 50000 + Math.random() * 20000); }, 4000 + Math.random() * 12000);  // 처음은 4~16초 뒤 (여러 명이 동시에 열어도 흩어지게)
+  const today = new Date().toLocaleDateString("ko-KR");
+  if (ls.get("dush-visit") !== today) { ls.set("dush-visit", today); q.push({ ev: "방문", at: Date.now() }); save(); }
+  return (ev, target) => {
+    if (ev === "탐방완료") { const k = "dush-done-" + target; if (ls.get(k)) return; ls.set(k, "1"); }  // 학과마다 한 번만
+    q.push({ ev, target, at: Date.now() }); save();
+  };
+})();
+
 /* ---------- 장면 & 카메라 ---------- */
 const img = $("#sceneImg"), actor = $("#actorImg"), sceneEl = $("#scene");
 let cam = { x: .5, y: .38, z: 1 }, curCourse = null, actorFor = null;
@@ -529,6 +566,7 @@ function miniGame(c) {
     };
     const finish = won => { if (stop) stop(); hide(); resolve(won); };
     const start = () => {
+      track("게임", c.name);
       msg.hidden = true; area.innerHTML = ""; btns.innerHTML = ""; hud("", "");
       let ended = false, t0 = performance.now();
       const end = (won, why, res) => {
@@ -729,6 +767,7 @@ async function runCourse(c) {
   // 5) 마지막 인사: 다시 함께
   showSprite("pair");
   await lines(c.bye);
+  track("탐방완료", c.name);
   if (!prog.done.includes(c.id)) prog.done.push(c.id);
   saveProg();
   await fade(() => { showSprite(null); cgMode = false; curCourse = null; return hub(c.id); });
